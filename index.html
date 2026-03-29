@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>修仙AI小镇 · 单机版</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0d0d1a; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; font-family:"微软雅黑",sans-serif; color:#e0e0e0; overflow:hidden; user-select:none; }
+#game-container { position:relative; }
+#game-canvas { display:block; border:2px solid #2a2a4a; box-shadow:0 0 40px rgba(100,50,200,0.4); cursor:crosshair; }
+#ui-overlay { position:absolute; top:0; left:0; pointer-events:none; width:100%; height:100%; }
+#dialog-input-capture { position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; z-index:10; }
+#start-screen { position:absolute; inset:0; background:rgba(5,5,15,0.96); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:100; }
+#start-screen h1 { font-size:42px; color:#ffd700; text-shadow:0 0 20px rgba(255,200,0,0.5); margin-bottom:8px; }
+#start-screen .sub { color:#9c27b0; font-size:16px; margin-bottom:40px; letter-spacing:4px; }
+.btn { background:linear-gradient(135deg,#1a1a4a,#2a1060); border:1px solid #7e57c2; color:#e0e0e0; padding:12px 36px; border-radius:6px; font-size:16px; font-family:inherit; cursor:pointer; margin:6px; transition:all 0.2s; }
+.btn:hover { background:linear-gradient(135deg,#2a2a6a,#3a1880); box-shadow:0 0 12px rgba(150,80,255,0.4); }
+.apikey-row { margin:20px 0; display:flex; flex-direction:column; align-items:center; gap:6px; }
+.apikey-row label { color:#aaa; font-size:13px; }
+.apikey-row input { background:rgba(255,255,255,0.07); border:1px solid #4a4a7a; color:#fff; padding:8px 14px; border-radius:4px; font-size:13px; width:320px; font-family:monospace; }
+#loading { color:#9c27b0; font-size:18px; margin-top:20px; }
+</style>
+</head>
+<body>
+<!-- Matter.js CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+
+<!-- ── 三级节点（数据层） ───────────────────────────── -->
+<script src="js/data/items.js"></script>
+<script src="js/data/recipes.js"></script>
+<script src="js/data/skills.js"></script>
+<script src="js/data/npcs.js"></script>
+<script src="js/data/buildings.js"></script>
+<script src="js/data/biomes.js"></script>
+
+<!-- ── 二级节点（系统层）──────────────────────────── -->
+<script src="js/constants.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/physics.js"></script>
+<script src="js/world.js"></script>
+<script src="js/weather.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/combat.js"></script>
+<script src="js/building.js"></script>
+<script src="js/resource.js"></script>
+<script src="js/craft.js"></script>
+<script src="js/cultivation.js"></script>
+<script src="js/social.js"></script>
+<script src="js/renderer.js"></script>
+<script src="js/ui.js"></script>
+
+<div id="game-container">
+  <canvas id="game-canvas"></canvas>
+  <div id="start-screen">
+    <h1>⚔️ 修仙AI小镇</h1>
+    <div class="sub">· 道法自然，天人合一 ·</div>
+    <div class="apikey-row">
+      <label>阿里云 Qwen API Key（NPC智能对话，可留空使用内置对话）</label>
+      <input id="api-key-input" type="password" placeholder="sk-xxxxxxxxxxxxxxxx">
+    </div>
+    <button class="btn" id="start-btn">▶ 开始修炼</button>
+    <div id="loading" style="display:none">加载中...</div>
+    <div style="color:#666;font-size:11px;margin-top:20px">
+      WASD移动 · J攻击 · F采集 · G修炼 · E背包 · C合成 · B建造 · T对话 · P门派
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// index.html - 根节点：游戏主逻辑入口 (≤800行)
+// ============================================================
+
+(function() {
+  'use strict';
+
+  // ── 游戏状态 ────────────────────────────────────────────
+  const GS = {
+    running: false,
+    paused:  false,
+    keys:    {},
+    mouse:   { x:0, y:0, wx:0, wy:0, down:false },
+    player:  null,
+    npcs:    null,
+    cam:     null,
+    frame:   0,
+    lastDt:  16,
+  };
+
+  // ── 初始化 ───────────────────────────────────────────────
+  function init() {
+    const canvas = document.getElementById('game-canvas');
+    Renderer.init(canvas);
+
+    Physics.init();
+    World.init();
+    Weather.init();
+    Entities.init();
+    Combat.init();
+    Building.init();
+    Resource.init();
+    Craft.init();
+    Cultivation.init();
+    Social.init();
+    UI.init();
+
+    // 物理碰撞监听
+    Physics.onCollision((idA, idB) => {
+      _handleCollision(idA, idB);
+    });
+
+    // 玩家物理体
+    Physics.addCircle('player', GS.player.x, GS.player.y, C.PLAYER_RADIUS, {
+      frictionAir: 0.2, inertia: Infinity,
+    });
+
+    GS.running = true;
+    requestAnimationFrame(_loop);
+  }
+
+  // ── 碰撞处理 ──────────────────────────────────────────────
+  function _handleCollision(idA, idB) {
+    // 投射物击中NPC（由combat.js内部处理，此处预留扩展）
+  }
+
+  // ── 主循环 ──────────────────────────────────────────────
+  function _loop(timestamp) {
+    if (!GS.running) return;
+    requestAnimationFrame(_loop);
+    if (GS.paused) return;
+
+    GS.frame++;
+    const player = Entities.getPlayer();
+    const npcs   = Entities.getNPCs();
+    const weatherCfg = Weather.getCfg();
+    const spiritAtPos = World.getSpiritAt(player.x, player.y);
+
+    // ── 物理步进 ──────────────────────────────────────────
+    Physics.step(C.PHYSICS_STEP);
+
+    // ── 各系统更新 ────────────────────────────────────────
+    Entities.updatePlayer(GS.lastDt, GS.keys, 0, 0, weatherCfg, spiritAtPos);
+    Entities.updateNPCs(GS.lastDt, weatherCfg);
+    World.update(GS.lastDt);
+    World.updateCamera(player.x, player.y, GS.lastDt);
+    Weather.update(GS.lastDt);
+    Building.update(GS.lastDt, player, weatherCfg);
+    Resource.update(GS.lastDt, player, weatherCfg);
+    Craft.update(GS.lastDt, player);
+    Cultivation.update(GS.lastDt, player, weatherCfg, spiritAtPos);
+    Combat.update(GS.lastDt, player, npcs);
+    Social.updateNPCSocial(npcs, GS.lastDt);
+    Utils.updateFloatingTexts(GS.lastDt);
+    Utils.updateNotifications(GS.lastDt);
+
+    // 建造预览同步鼠标
+    if (Building.isBuildMode()) {
+      const cam = World.getCamera();
+      Building.updatePreview(GS.mouse.x + cam.x, GS.mouse.y + cam.y, player);
+    }
+
+    // ── 渲染 ─────────────────────────────────────────────
+    const cam = World.getCamera();
+    GS.cam = cam;
+    GS.player = player;
+    GS.npcs   = npcs;
+
+    GS.lastDt = Renderer.render(timestamp, {
+      player, npcs, cam,
+    });
+  }
+
+  // ── 键盘输入 ─────────────────────────────────────────────
+  document.addEventListener('keydown', e => {
+    GS.keys[e.key] = true;
+
+    // 对话模式：捕获文字输入
+    if (Social.isDialogActive()) {
+      if (e.key === 'Escape') { Social.closeDialog(); return; }
+      if (e.key === 'Enter') {
+        Social.sendMessage(Social.getInput(), Entities.getPlayer()); return;
+      }
+      if (e.key === 'Backspace') { Social.backspaceInput(); return; }
+      if (e.key.length === 1) { Social.appendInput(e.key); return; }
+      return;
+    }
+
+    const player = Entities.getPlayer();
+    switch(e.key) {
+      // 战斗
+      case 'j': case 'J':
+        Entities.playerAttack();
+        Combat.registerHit();
+        break;
+      case 'q': case 'Q':
+        Combat.useSkill(player, player.cultSkillId);
+        break;
+      case 'x': case 'X':
+        Combat.dodge(player, GS.keys);
+        break;
+
+      // 采集
+      case 'f': case 'F':
+        if (Resource.isGathering()) Resource.cancelGather();
+        else Resource.tryGather(player);
+        break;
+
+      // 修炼
+      case 'g': case 'G':
+        Cultivation.toggleCultivate(player);
+        break;
+
+      // 烹饪（靠近火源自动烤肉）
+      case 'r': case 'R':
+        Craft.cookMeat(player);
+        break;
+
+      // UI面板
+      case 'e': case 'E':
+        UI.togglePanel('inventory');
+        break;
+      case 'c': case 'C':
+        UI.togglePanel('craft');
+        break;
+      case 'b': case 'B':
+        if (Building.isBuildMode()) Building.exitBuildMode();
+        else UI.togglePanel('build');
+        break;
+      case 'p': case 'P':
+        UI.togglePanel('sect');
+        break;
+      case 'k': case 'K':
+        UI.togglePanel('cultivate');
+        break;
+      case 'Tab':
+        e.preventDefault();
+        UI.togglePanel('settings');
+        break;
+
+      // 对话
+      case 't': case 'T':
+        _tryStartDialog();
+        break;
+
+      // 快捷栏1-9（门派面板开启时优先处理门派选择）
+      case '1': case '2': case '3': case '4': case '5':
+      case '6': case '7': case '8': case '9':
+        if (UI.getActivePanel() === 'sect') {
+          const idx = parseInt(e.key) - 1;
+          const sectKeys = Object.keys(C.SECTS);
+          if (sectKeys[idx]) Cultivation.foundSect(player, sectKeys[idx]);
+          e.preventDefault();
+        } else {
+          UI.setHotbar(parseInt(e.key) - 1);
+        }
+        break;
+
+      // 使用快捷栏物品
+      case 'z': case 'Z':
+        _useHotbarItem();
+        break;
+
+      // Esc关闭面板/建造
+      case 'Escape':
+        if (Building.isBuildMode()) { Building.exitBuildMode(); break; }
+        UI.closeAllPanels();
+        break;
+    }
+  });
+
+  document.addEventListener('keyup', e => { GS.keys[e.key] = false; });
+
+  // ── 鼠标输入 ─────────────────────────────────────────────
+  document.getElementById('game-canvas').addEventListener('mousemove', e => {
+    const rect = e.target.getBoundingClientRect();
+    GS.mouse.x = e.clientX - rect.left;
+    GS.mouse.y = e.clientY - rect.top;
+    UI.setMouse(GS.mouse.x, GS.mouse.y);
+  });
+
+  document.getElementById('game-canvas').addEventListener('click', e => {
+    if (!GS.running) return;
+    const rect = e.target.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    if (Social.isDialogActive()) return;
+
+    // UI点击
+    UI.handleClick(mx, my, Entities.getPlayer());
+
+    // 若建造模式，确认放置
+    if (Building.isBuildMode()) return; // 已在UI.handleClick处理
+
+    // 普通点击：攻击
+    if (!UI.getActivePanel()) {
+      Entities.playerAttack();
+      Combat.registerHit();
+    }
+  });
+
+  // ── 辅助函数 ─────────────────────────────────────────────
+  function _tryStartDialog() {
+    const player = Entities.getPlayer();
+    const npcs   = Entities.getNPCs();
+    const nearby = Social.getNearbyNPC(player, npcs);
+    if (nearby) {
+      Social.startDialog(nearby, player);
+      UI.closeAllPanels();
+    } else {
+      Utils.notify('附近没有可对话的NPC', '#aaa');
+    }
+  }
+
+  function _useHotbarItem() {
+    const player = Entities.getPlayer();
+    const idx    = UI.getHotbar();
+    const item   = player.inventory[idx];
+    if (!item) return;
+    const r = Entities.useItem(item.id);
+    if (r === 'add_fuel') {
+      const near = Building.getBuildingsNear(player, 80);
+      const fire = near.find(b => b.isFireSource);
+      if (fire) Building.addFuel(fire.id, item.id, player);
+      else Utils.notify('附近没有篝火', '#f44336');
+    }
+  }
+
+  // ── 开始按钮 ─────────────────────────────────────────────
+  document.getElementById('start-btn').addEventListener('click', () => {
+    const apiKey = document.getElementById('api-key-input').value.trim();
+    if (apiKey) Social.setApiKey(apiKey);
+
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('start-btn').disabled = true;
+
+    setTimeout(() => {
+      document.getElementById('start-screen').style.display = 'none';
+      GS.player = Entities.getPlayer();
+      init();
+    }, 100);
+  });
+
+  // ── 初始添加一些起始物品 ─────────────────────────────────
+  // （在DOMContentLoaded时挂在GS上，init()后才能调用Entities）
+  window.addEventListener('DOMContentLoaded', () => {
+    // 延迟到init()后注入起始物品
+    const origInit = window.init;
+  });
+
+  // ── 游戏初始化后给玩家起始背包 ──────────────────────────
+  const _origInit = init;
+  function initWithStarter() {
+    _origInit();
+    const player = Entities.getPlayer();
+    Entities.addItemToInventory(player, 'wood',       10);
+    Entities.addItemToInventory(player, 'stone',       8);
+    Entities.addItemToInventory(player, 'firewood',    3);
+    Entities.addItemToInventory(player, 'raw_meat',    2);
+    Entities.addItemToInventory(player, 'spirit_herb', 3);
+    Entities.addItemToInventory(player, 'heal_pill',   2);
+    player.gold = 50;
+    Utils.notify('✨欢迎来到修仙小镇！WASD移动，T与NPC对话', '#ffd700', 6000);
+    Utils.notify('提示：靠近篝火🔥可烤生肉(R)，直接吃生肉容易生病！', '#ff9800', 8000);
+  }
+
+  // 替换为含起始物品的版本
+  document.getElementById('start-btn').onclick = () => {
+    const apiKey = document.getElementById('api-key-input').value.trim();
+    if (apiKey) Social.setApiKey(apiKey);
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('start-btn').disabled = true;
+    setTimeout(() => {
+      document.getElementById('start-screen').style.display = 'none';
+      GS.player = Entities.getPlayer();
+      initWithStarter();
+    }, 100);
+  };
+
+})();
+</script>
+</body>
+</html>
