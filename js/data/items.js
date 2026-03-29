@@ -18,6 +18,7 @@ const ITEMS = {
   FIRE_CRYSTAL:   { id:'fire_crystal',  name:'火晶石',  type:'material', icon:'🔴' },
   BEAST_SKIN:     { id:'beast_skin',    name:'兽皮',    type:'material', icon:'🧶' },
   BONE:           { id:'bone',          name:'兽骨',    type:'material', icon:'🦴' },
+  FUR:            { id:'fur',           name:'毛发',    type:'material', icon:'🐑' },
 
   // 装备类
   IRON_SWORD:     { id:'iron_sword',    name:'铁剑',    type:'weapon', atk:15, icon:'⚔️' },

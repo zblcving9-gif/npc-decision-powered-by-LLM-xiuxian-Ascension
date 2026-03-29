@@ -78,23 +78,34 @@ const Social = (() => {
     dialogHistory.push({ role:'user', text, ts: Date.now() });
     inputText = '';
 
-    // 构建系统Prompt（融入修仙世界观和NPC状态）
+    // 构建系统Prompt（融入修仙世界观、NPC状态、周边环境）
     const realm = Cultivation.getRealm(player.realmIdx);
     const spirit = World.getSpiritAt(player.x, player.y);
     const weather = Weather.getCurrent();
+    const weatherCfg = Weather.getCfg();
     const relation = relations[currentNPC.id] || 50;
     const npcTpl = NPC_TEMPLATES[currentNPC.tplId] || {};
+    // 附近NPC
+    const npcs = Entities.getNPCs();
+    const nearbyNames = npcs.filter(n => n.alive && n !== currentNPC && Utils.dist(currentNPC, n) < 200).map(n => n.name);
+    const nearbyStr = nearbyNames.length > 0 ? `附近有：${nearbyNames.join('、')}` : '附近没有其他人';
+    // 附近事件
+    const recentLogs = Utils.getWorldLog().slice(-5).filter(l => l.speaker !== currentNPC.name);
+    const eventStr = recentLogs.length > 0 ? `最近发生：${recentLogs.map(l=>`${l.speaker}：${l.text}`).join('；')}` : '';
 
     const systemPrompt = `你是修仙小镇中的一个NPC角色。
 角色名：${currentNPC.name}
 角色职业：${npcTpl.role || '居民'}
 角色性格：${_getPersonality(currentNPC)}
 当前与玩家的好感度：${relation}/100
-当前环境：${weather}天气，当地灵力浓度${(spirit*100).toFixed(0)}%
+当前环境：${weatherCfg.label}天气，当地灵力浓度${(spirit*100).toFixed(0)}%
+${nearbyStr}
+${eventStr}
 玩家信息：境界「${realm.name}」，HP ${Math.floor(player.hp)}/${player.hpMax}，灵力 ${Math.floor(player.spirit)}/${player.spiritMax}${player.sick ? '，正在生病' : ''}${player.sectId ? `，门派「${C.SECTS[player.sectId]?.name}」` : ''}
 
 请用符合修仙世界观的语气回应，言简意赅（不超过80字），根据好感度调整亲疏。
-好感度<30时态度冷淡，30-70正常，>70亲切热情。`;
+好感度<30时态度冷淡，30-70正常，>70亲切热情。
+结合当前天气、灵力、附近的人和发生的事来对话。`;
 
     // 构建对话历史
     const messages = [
@@ -206,7 +217,17 @@ const Social = (() => {
 
   // NPC间AI对话（异步，结果作为浮动文字显示）
   async function _npcToNpcChat(npcA, npcB) {
-    const prompt = `你是修仙小镇NPC「${npcA.name}」，正在和「${npcB.name}」聊天，用一句话（不超过30字）说一件修仙世界的日常趣事或感叹。`;
+    // 收集环境上下文
+    const weather = Weather.getCfg();
+    const spirit = World.getSpiritAt(npcA.x, npcA.y);
+    const realmA = npcA.role ? `职业：${npcA.role}` : '';
+    // 收集附近事件（最近几条世界日志）
+    const recentLogs = Utils.getWorldLog().slice(-5).filter(l => l.speaker !== npcA.name);
+    const eventCtx = recentLogs.length > 0 ? `最近发生的事：${recentLogs.map(l=>`${l.speaker}：${l.text}`).join('；')}` : '最近没什么特别的事';
+    const prompt = `你是修仙小镇NPC「${npcA.name}」，${realmA}，正在和「${npcB.name}」聊天。
+当前环境：${weather.label}${weather.icon}天气，当地灵力浓度${(spirit*100).toFixed(0)}%。
+${eventCtx}
+用一句话（不超过30字）结合当前环境和身边发生的事聊天。`;
     try {
       const resp = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
         method: 'POST',

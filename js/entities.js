@@ -75,6 +75,19 @@ const Entities = (() => {
       { tpl:'SPIRIT_BEAST_ELDER', x:1100, y:600 },
       // Lv5 魔化灵兽（远区Boss）
       { tpl:'DEMON_BEAST',    x:1400, y:900 },
+      // 被动动物（可采集资源）
+      { tpl:'DEER',           x:300,  y:350 },
+      { tpl:'DEER',           x:550,  y:300 },
+      { tpl:'RABBIT',         x:250,  y:500 },
+      { tpl:'RABBIT',         x:420,  y:320 },
+      { tpl:'RABBIT',         x:650,  y:480 },
+      { tpl:'WILD_BOAR',      x:380,  y:200 },
+      { tpl:'WILD_BOAR',      x:700,  y:450 },
+      { tpl:'WILD_CHICKEN',   x:340,  y:440 },
+      { tpl:'WILD_CHICKEN',   x:500,  y:380 },
+      { tpl:'WILD_CHICKEN',   x:280,  y:290 },
+      { tpl:'SILK_DEER',      x:600,  y:300 },
+      { tpl:'SILK_DEER',      x:450,  y:520 },
     ];
     for (const s of spawns) {
       const tpl = NPC_TEMPLATES[s.tpl];
@@ -251,6 +264,8 @@ const Entities = (() => {
 
       if (npc.hostile) {
         _aiHostile(npc, dt, weatherCfg);
+      } else if (npc.role === 'passive') {
+        _aiPassive(npc, dt);
       } else {
         _aiFriendly(npc, dt);
       }
@@ -305,6 +320,23 @@ const Entities = (() => {
         npc.atkCooldown = 1200;
         _npcAttackTarget(npc, t);
       }
+    } else {
+      _patrol(npc, dt);
+    }
+  }
+
+  // 被动动物AI：巡逻，玩家靠近时逃跑，无攻击
+  function _aiPassive(npc, dt) {
+    const dToPlayer = Utils.dist(npc, player);
+    const fleeRange = npc.fleeRange || 100;
+    if (dToPlayer < fleeRange) {
+      const n = Utils.normalize(npc.x - player.x, npc.y - player.y);
+      const spd = C.NPC_PATROL_SPEED * 1.8 / 60;
+      Physics.setVelocity(npc.id, n.x * spd, n.y * spd);
+      npc.fleeTimer = 2000;
+    } else if ((npc.fleeTimer || 0) > 0) {
+      npc.fleeTimer -= dt;
+      if (npc.fleeTimer <= 0) npc.fleeTimer = 0;
     } else {
       _patrol(npc, dt);
     }
@@ -415,7 +447,8 @@ const Entities = (() => {
     const fy = player.y + player.facing.y * range;
 
     for (const npc of npcs) {
-      if (!npc.alive || !npc.hostile) continue;
+      if (!npc.alive) continue;
+      if (!npc.hostile && npc.role !== 'passive') continue;
       if (Math.hypot(npc.x - fx, npc.y - fy) < 40) {
         const isCrit = Math.random() < (0.05 + getBuffValue(player, 'crit_rate'));
         let dmg = Math.max(1, player.atk - npc.def + Utils.randInt(-3, 3));

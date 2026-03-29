@@ -176,6 +176,66 @@ const NPC_TEMPLATES = {
     combatBrave: true,
   },
 
+  // ── 被动动物（无攻击力，逃跑型，提供资源） ──────────
+  DEER: {
+    id: 'deer', name: '梅花鹿', role: 'passive',
+    icon: '🦌', hp: 30, atk: 0, def: 0, level: 1,
+    xpReward: 5, hostile: false, faction: 'animal',
+    dialogue: {}, skills: [],
+    loot: [
+      { id:'raw_meat', qty:2, chance:0.9 },
+      { id:'bone', qty:1, chance:0.6 },
+      { id:'fur', qty:1, chance:0.5 },
+    ],
+    fleeRange: 120,
+  },
+  RABBIT: {
+    id: 'rabbit', name: '野兔', role: 'passive',
+    icon: '🐰', hp: 15, atk: 0, def: 0, level: 1,
+    xpReward: 2, hostile: false, faction: 'animal',
+    dialogue: {}, skills: [],
+    loot: [
+      { id:'raw_meat', qty:1, chance:0.8 },
+      { id:'fur', qty:1, chance:0.7 },
+    ],
+    fleeRange: 100,
+  },
+  WILD_BOAR: {
+    id: 'wild_boar', name: '野猪', role: 'passive',
+    icon: '🐗', hp: 60, atk: 3, def: 2, level: 1,
+    xpReward: 8, hostile: false, faction: 'animal',
+    dialogue: {}, skills: [],
+    loot: [
+      { id:'raw_meat', qty:2, chance:0.9 },
+      { id:'bone', qty:1, chance:0.5 },
+      { id:'fur', qty:1, chance:0.3 },
+    ],
+    fleeRange: 80, // 野猪胆大，逃跑距离短
+  },
+  WILD_CHICKEN: {
+    id: 'wild_chicken', name: '灵鸡', role: 'passive',
+    icon: '🐔', hp: 12, atk: 0, def: 0, level: 1,
+    xpReward: 2, hostile: false, faction: 'animal',
+    dialogue: {}, skills: [],
+    loot: [
+      { id:'raw_meat', qty:1, chance:0.7 },
+      { id:'fur', qty:1, chance:0.4 },
+    ],
+    fleeRange: 110,
+  },
+  SILK_DEER: {
+    id: 'silk_deer', name: '玉角羊', role: 'passive',
+    icon: '🐑', hp: 45, atk: 0, def: 1, level: 1,
+    xpReward: 6, hostile: false, faction: 'animal',
+    dialogue: {}, skills: [],
+    loot: [
+      { id:'raw_meat', qty:1, chance:0.8 },
+      { id:'fur', qty:2, chance:0.9 },
+      { id:'bone', qty:1, chance:0.3 },
+    ],
+    fleeRange: 100,
+  },
+
   ALCHEMIST: {
     id: 'alchemist', name: '炼丹师', role: 'teacher',
     icon: '⚗️', hp: 250, atk: 15, def: 10, level: 4,

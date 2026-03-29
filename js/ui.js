@@ -250,6 +250,23 @@ const UI = (() => {
     const hint=offset>0?`↑还有${offset}条历史（滚轮↑↓翻阅，到底自动回最新）`:'L 关闭 · 点击标签切换';
     ctx.fillStyle=offset>0?'#888':'#555';ctx.font='10px 微软雅黑';ctx.textAlign='center';
     ctx.fillText(hint,px+pw/2,py+ph-8);ctx.textAlign='left';
+    // 鼠标悬停展开完整消息
+    const rowH=26,msgAreaTop=py+58,msgAreaBot=py+58+maxVisible*rowH;
+    if(mouseX>=px&&mouseX<=px+pw&&mouseY>=msgAreaTop&&mouseY<=Math.min(msgAreaBot,py+ph-18)){
+      const hoverIdx=Math.floor((mouseY-msgAreaTop)/rowH);
+      if(hoverIdx>=0&&hoverIdx<visible.length){
+        const hmsg=visible[hoverIdx],hcc=WTABS.find(t=>t.id===hmsg.category)?.color||'#78909c';
+        const fullTxt=`[${hmsg.speaker}] ${hmsg.text||''}`;
+        ctx.font='11px 微软雅黑';
+        const tw=ctx.measureText(fullTxt).width+20,th=28;
+        let tx=mouseX+12,ty=mouseY-th/2;
+        if(tx+tw>C.CANVAS_W-4)tx=mouseX-tw-8;
+        if(ty<4)ty=4;if(ty+th>C.CANVAS_H-4)ty=C.CANVAS_H-th-4;
+        ctx.fillStyle='rgba(10,10,30,0.92)';Utils.roundRect(ctx,tx,ty,tw,th,4);ctx.fill();
+        ctx.strokeStyle=hcc;ctx.lineWidth=1;Utils.roundRect(ctx,tx,ty,tw,th,4);ctx.stroke();
+        ctx.fillStyle='#fff';ctx.font='11px 微软雅黑';ctx.fillText(fullTxt,tx+8,ty+18);
+      }
+    }
   }
   function _mt(t,f){const c=document.createElement('canvas').getContext('2d');c.font=f||'11px 微软雅黑';return c.measureText(t).width;}
   function _handleWorldTabClick(wx,wy){if(!Social.isWorldPanelOpen())return false;
