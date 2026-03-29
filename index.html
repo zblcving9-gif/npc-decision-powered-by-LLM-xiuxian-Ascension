@@ -62,7 +62,7 @@ body { background:#0d0d1a; display:flex; flex-direction:column; align-items:cent
     <button class="btn" id="start-btn">▶ 开始修炼</button>
     <div id="loading" style="display:none">加载中...</div>
     <div style="color:#666;font-size:11px;margin-top:20px">
-      WASD移动 · J攻击 · F采集 · G修炼 · E背包 · C合成 · B建造 · T对话 · P门派
+      WASD移动 · J攻击 · F采集 · G修炼 · E背包 · C合成 · B建造 · T对话 · P门派 · N交互
     </div>
   </div>
 </div>
@@ -112,7 +112,7 @@ body { background:#0d0d1a; display:flex; flex-direction:column; align-items:cent
 
     // 玩家物理体
     Physics.addCircle('player', GS.player.x, GS.player.y, C.PLAYER_RADIUS, {
-      frictionAir: 0.2, inertia: Infinity,
+      frictionAir: 0.6,
     });
 
     GS.running = true;
@@ -247,6 +247,11 @@ body { background:#0d0d1a; display:flex; flex-direction:column; align-items:cent
       // 世界消息面板
       case 'l': case 'L':
         Social.toggleWorldPanel();
+        break;
+
+      // 建筑交互（门开关/床休息/木桩训练）
+      case 'n': case 'N':
+        Building.interact(player);
         break;
 
       // 快捷栏1-9（门派面板开启时优先处理门派选择）

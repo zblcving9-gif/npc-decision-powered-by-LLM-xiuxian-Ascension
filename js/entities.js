@@ -159,23 +159,17 @@ const Entities = (() => {
     player.atk = 10 + weaponAtk + getBuffValue(player, 'atk');
     player.def = 5  + armorDef  + getBuffValue(player, 'def');
 
-    Physics.setVelocity('player',
-      player.moving ? n.x * spd / 60 : 0,
-      player.moving ? n.y * spd / 60 : 0,
-    );
-    // 同步位置 + 边界夹取
-    const pos = Physics.getPos('player');
-    if (pos) {
-      const mapW = C.MAP_TILES_X * C.TILE_SIZE;
-      const mapH = C.MAP_TILES_Y * C.TILE_SIZE;
-      const pad = C.MAP_BOUND_PAD;
-      const cx = Utils.clamp(pos.x, pad, mapW - pad);
-      const cy = Utils.clamp(pos.y, pad, mapH - pad);
-      player.x = cx; player.y = cy;
-      if (pos.x !== cx || pos.y !== cy) {
-        Physics.setPos('player', cx, cy);
-      }
-    }
+    // 基于dt的手动位置计算，绕过物理velocity惯性问题
+    const moveX = n.x * spd * dt / 1000;
+    const moveY = n.y * spd * dt / 1000;
+    const mapW = C.MAP_TILES_X * C.TILE_SIZE;
+    const mapH = C.MAP_TILES_Y * C.TILE_SIZE;
+    const pad = C.MAP_BOUND_PAD;
+    const nx = Utils.clamp(player.x + moveX, pad, mapW - pad);
+    const ny = Utils.clamp(player.y + moveY, pad, mapH - pad);
+    player.x = nx; player.y = ny;
+    Physics.setPos('player', nx, ny);
+    Physics.setVelocity('player', 0, 0); // 清除物理速度
   }
 
   function _updateHunger(dt) {

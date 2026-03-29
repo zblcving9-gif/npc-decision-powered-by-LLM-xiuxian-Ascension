@@ -204,13 +204,13 @@ const UI = (() => {
 
   // ── 建造面板 ──────────────────────────────────────────────
   function _drawBuildPanel(ctx, player) {
-    const pw = 440, ph = 360;
+    const pw = 440, ph = 580;
     const px = C.CANVAS_W/2 - pw/2, py = C.CANVAS_H/2 - ph/2;
     _drawPanel(ctx, px, py, pw, ph, '建造');
 
     const tpls = Object.values(BUILDING_TEMPLATES);
     tpls.forEach((tpl, i) => {
-      if (i >= 8) return;
+      if (i >= 14) return;
       const ry = py + 38 + i * 38;
       const cat = BUILDING_CATEGORIES[tpl.category];
       ctx.fillStyle = 'rgba(255,255,255,0.05)';
@@ -436,7 +436,7 @@ const UI = (() => {
       'E 背包', 'C 合成',
       'B 建造', 'Z 使用物品',
       'T 对话', 'P 门派',
-      'L 世界消息',
+      'L 世界消息', 'N 交互',
     ];
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     Utils.roundRect(ctx, C.CANVAS_W-160, C.CANVAS_H-152, 150, 142, 4); ctx.fill();
@@ -490,9 +490,9 @@ const UI = (() => {
     }
     if (activePanel === 'build') {
       const tpls=Object.values(BUILDING_TEMPLATES);
-      const pw=440, ph=360, px=C.CANVAS_W/2-pw/2, py=C.CANVAS_H/2-ph/2;
+      const pw=440, ph=580, px=C.CANVAS_W/2-pw/2, py=C.CANVAS_H/2-ph/2;
       tpls.forEach((tpl, i) => {
-        if (i>=8) return;
+        if (i>=14) return;
         const ry=py+38+i*38;
         if (wx>=px+10&&wx<=px+pw-10&&wy>=ry&&wy<=ry+34) {
           Building.enterBuildMode(tpl.id);
