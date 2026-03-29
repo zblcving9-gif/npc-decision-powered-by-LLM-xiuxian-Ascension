@@ -1,0 +1,4 @@
+node_modules/
+.workbuddy/
+.playwright-cli/
+*.log
