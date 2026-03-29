@@ -1,10 +1,10 @@
 # 修仙AI小镇 · 文件依赖有向图矩阵
 
-> **当前版本：v7**（Bug修复 · 2026-03-29）
-> 上一版本：[DEPENDENCY_MATRIX v6.md](./DEPENDENCY_MATRIX%20v6.md)
+> **当前版本：v6**（功能迭代 · 2026-03-29）
+> 上一版本：[DEPENDENCY_MATRIX v5.md](./DEPENDENCY_MATRIX%20v5.md)
 > 增量说明：[DELTA DEPENDENCY_MATRIX.md](./DELTA%20DEPENDENCY_MATRIX.md)
 >
-> **v7变更摘要：** 世界信息面板增加分类标签页（全部/对话/打斗/门派/其它）；通知消息限制最多8条且下移避开小地图；addWorldLog增加category参数。依赖关系矩阵无变化。
+> **v6变更摘要：** 修复Shift跑步方向失控Bug（去掉inertia:Infinity，改用手动位置同步）；新增围墙、床、桌、开关门、练武木桩5种建造对象；门识别主人开关（N键）；床睡觉恢复全属性；木桩训练消耗体力换XP。依赖关系矩阵无变化。
 
 ## 文件编号映射
 
@@ -97,7 +97,7 @@
 | 三级节点间不互相引用（正交分解）| ✅ F16~F21 互相 matrix 均为 0 |
 | 最多三级节点，单向引用树 | ✅ |
 | index.html ≤ 800行 | ✅ 347行 |
-| 二级节点每个 ≤ 300行 | ⚠️ entities.js 543行（历史遗留），其余均≤300行 |
+| 二级节点每个 ≤ 300行 | ⚠️ entities.js 543行（历史遗留） |
 | 三级节点每个 ≤ 100行 | ✅ |
 
 ---

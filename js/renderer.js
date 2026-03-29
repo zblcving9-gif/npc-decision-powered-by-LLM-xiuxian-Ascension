@@ -71,7 +71,7 @@ const Renderer = (() => {
 
   function _drawNotifications(ctx) {
     const notes = Utils.getNotifications();
-    const x = C.CANVAS_W - 270, startY = 120;
+    const x = C.CANVAS_W - 270, startY = 160;
     notes.forEach((n, i) => {
       const alpha = Math.min(1, n.timer / 500);
       ctx.globalAlpha = alpha;

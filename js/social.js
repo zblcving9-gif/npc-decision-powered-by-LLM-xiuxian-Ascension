@@ -18,9 +18,9 @@ const Social = (() => {
   // 世界消息面板开关
   let worldPanelOpen = false;
 
-  // 记录世界日志（委托给Utils）
-  function _addWorldLog(speaker, text) {
-    Utils.addWorldLog(speaker, text.slice(0, 80));
+  // 记录世界日志（委托给Utils，分类为dialog）
+  function _addWorldLog(speaker, text, category = 'dialog') {
+    Utils.addWorldLog(speaker, text.slice(0, 80), category);
   }
 
   function init() {}

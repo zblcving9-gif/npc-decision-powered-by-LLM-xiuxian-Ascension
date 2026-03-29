@@ -173,18 +173,19 @@ const Utils = (() => {
   }
   function getChatBubbles() { return chatBubbles; }
 
-  // 世界消息日志（半透明信息面板）
+  // 世界消息日志（半透明信息面板，支持分类：dialog/combat/sect/other）
   const worldLog = [];
   const WORLD_LOG_MAX = 50;
-  function addWorldLog(speaker, text) {
-    worldLog.push({ speaker, text, ts: Date.now() });
+  function addWorldLog(speaker, text, category = 'other') {
+    worldLog.push({ speaker, text, category, ts: Date.now() });
     if (worldLog.length > WORLD_LOG_MAX) worldLog.shift();
   }
   function getWorldLog() { return worldLog; }
 
-  // 简单通知队列
+  // 简单通知队列（最多8条）
   const notifications = [];
   function notify(msg, color = '#fff', duration = 3000) {
+    if (notifications.length >= 8) return; // 限制最多8条
     notifications.push({ msg, color, timer: duration });
   }
   function updateNotifications(dt) {

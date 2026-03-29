@@ -383,7 +383,7 @@ const Entities = (() => {
       target.alive = false;
       target.respawnTimer = 0;
       Utils.notify(`${target.name} 被击倒！`, '#f44336');
-      Utils.addWorldLog('⚠️危急', `${target.name} 被击倒了！`);
+      Utils.addWorldLog('⚠️危急', `${target.name} 被击倒了！`, 'combat');
     }
   }
 
@@ -435,7 +435,7 @@ const Entities = (() => {
           const xpGain = (npc.xpReward || 0) + Utils.randInt(0, 5);
           if (xpGain > 0) addXP(xpGain);
           Utils.notify(`击败 ${npc.name}（Lv${npc.level||1}）+${xpGain}XP`, '#ffd700');
-          Utils.addWorldLog('⚔️战斗', `击败了 ${npc.name}（Lv${npc.level||1}）`);
+          Utils.addWorldLog('⚔️战斗', `击败了 ${npc.name}（Lv${npc.level||1}）`, 'combat');
         }
       }
     }
