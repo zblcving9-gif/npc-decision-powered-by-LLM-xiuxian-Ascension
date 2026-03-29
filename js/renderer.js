@@ -69,18 +69,22 @@ const Renderer = (() => {
     return dt;
   }
 
+  // 通知绘制（顶部中间，最多4条）
   function _drawNotifications(ctx) {
     const notes = Utils.getNotifications();
-    const x = C.CANVAS_W - 270, startY = 160;
+    const cx = C.CANVAS_W / 2, startY = 8;
     notes.forEach((n, i) => {
+      const tw = ctx.measureText ? 260 : 260;
       const alpha = Math.min(1, n.timer / 500);
       ctx.globalAlpha = alpha;
       ctx.fillStyle = 'rgba(20,20,40,0.75)';
-      Utils.roundRect(ctx, x - 4, startY + i * 28 - 16, 264, 22, 4);
+      Utils.roundRect(ctx, cx - 134, startY + i * 26, 268, 22, 4);
       ctx.fill();
       ctx.fillStyle = n.color || '#fff';
       ctx.font = '12px 微软雅黑';
-      ctx.fillText(n.msg, x, startY + i * 28);
+      ctx.textAlign = 'center';
+      ctx.fillText(n.msg, cx, startY + i * 26 + 15);
+      ctx.textAlign = 'left';
       ctx.globalAlpha = 1;
     });
   }

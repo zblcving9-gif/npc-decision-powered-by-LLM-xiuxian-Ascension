@@ -311,6 +311,14 @@ body { background:#0d0d1a; display:flex; flex-direction:column; align-items:cent
     }
   });
 
+  // ── 滚轮（世界面板滚动历史记录） ─────────────────────
+  document.getElementById('game-canvas').addEventListener('wheel', e => {
+    if (!Social.isWorldPanelOpen()) return;
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 3 : -3; // 向下滚=看历史，向上滚=回最新
+    Utils.scrollWorldLog(delta);
+  }, { passive: false });
+
   // ── 辅助函数 ─────────────────────────────────────────────
   function _tryStartDialog() {
     const player = Entities.getPlayer();

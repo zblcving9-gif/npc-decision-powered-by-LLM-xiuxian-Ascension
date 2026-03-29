@@ -54,16 +54,13 @@ const UI = (() => {
       ctx.fillStyle='#888';ctx.font='9px sans-serif';ctx.fillText(i<9?i+1:'0',x+3,y+10);
     }
   }
-  // ── 天气
+  // ── 天气+修炼进度
   function _drawWeatherInfo(ctx){
-    const c=Weather.getCfg();
-    ctx.fillStyle=C.COLOR.PANEL;Utils.roundRect(ctx,C.CANVAS_W-160,115,150,30,4);ctx.fill();
+    const c=Weather.getCfg();ctx.fillStyle=C.COLOR.PANEL;Utils.roundRect(ctx,C.CANVAS_W-160,115,150,30,4);ctx.fill();
     ctx.fillStyle=C.COLOR.TEXT;ctx.font='13px 微软雅黑';ctx.textAlign='center';
     ctx.fillText(`${c.icon} ${c.label}  灵力×${c.spiritMul}`,C.CANVAS_W-85,134);ctx.textAlign='left';
   }
-  // ── 修炼进度
-  function _drawCultivationBar(ctx,p){
-    if(!Cultivation.isCultivating())return;
+  function _drawCultivationBar(ctx,p){if(!Cultivation.isCultivating())return;
     const n=100*Math.pow(1.5,(p.cultStage||1)-1),pg=((p.cultXp||0)%n)/n,x=10,y=C.CANVAS_H-70;
     ctx.fillStyle=C.COLOR.PANEL;Utils.roundRect(ctx,x,y,160,22,4);ctx.fill();
     Utils.drawBar(ctx,x+4,y+4,152,14,pg,1,'#9c27b0');
@@ -219,6 +216,10 @@ const UI = (() => {
     ctx.fillStyle='rgba(10,10,25,0.85)';Utils.roundRect(ctx,px,py,pw,ph,8);ctx.fill();
     ctx.strokeStyle='#4a4a7a';ctx.lineWidth=1;Utils.roundRect(ctx,px,py,pw,ph,8);ctx.stroke();
     ctx.fillStyle='#ffd700';ctx.font='bold 14px 微软雅黑';ctx.fillText('📜 世界消息',px+12,py+22);
+    // 记录总数
+    const logs=Utils.getWorldLog(),filt=worldPanelTab==='all'?logs:logs.filter(m=>m.category===worldPanelTab);
+    const totalCount=filt.length;
+    // 标签页
     let tabX=px+12;
     WTABS.forEach(tab=>{
       const act=worldPanelTab===tab.id,tw=ctx.measureText(tab.label).width+14;
@@ -230,9 +231,11 @@ const UI = (() => {
     });
     ctx.strokeStyle='rgba(255,255,255,0.08)';ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(px+8,py+50);ctx.lineTo(px+pw-8,py+50);ctx.stroke();
-    const logs=Utils.getWorldLog(),filt=worldPanelTab==='all'?logs:logs.filter(m=>m.category===worldPanelTab);
-    const sf=Math.max(0,filt.length-14);
-    filt.slice(sf).forEach((msg,i)=>{
+    // 消息列表（根据滚轮偏移显示）
+    const maxVisible=14,offset=Utils.getWorldLogOffset();
+    const endIdx=Math.max(0,totalCount-offset),startIdx=Math.max(0,endIdx-maxVisible);
+    const visible=filt.slice(startIdx,endIdx);
+    visible.forEach((msg,i)=>{
       const ly=py+58+i*26,cc=WTABS.find(t=>t.id===msg.category)?.color||'#78909c';
       ctx.fillStyle=cc;ctx.globalAlpha=0.5;Utils.roundRect(ctx,px+8,ly+1,3,16,1);ctx.fill();ctx.globalAlpha=1;
       ctx.fillStyle='#7a7aaa';ctx.font='10px 微软雅黑';
@@ -243,34 +246,26 @@ const UI = (() => {
       if(ctx.measureText(txt).width>mw){while(txt.length>1&&ctx.measureText(txt+'…').width>mw)txt=txt.slice(0,-1);txt+='…';}
       ctx.fillText('：'+txt,px+84+sw,ly+13);
     });
-    ctx.fillStyle='#555';ctx.font='10px 微软雅黑';ctx.textAlign='right';
-    ctx.fillText('L 关闭 · 点击标签切换分类',px+pw-8,py+ph-8);ctx.textAlign='left';
+    // 滚动提示+底部提示
+    const hint=offset>0?`↑还有${offset}条历史（滚轮↑↓翻阅，到底自动回最新）`:'L 关闭 · 点击标签切换';
+    ctx.fillStyle=offset>0?'#888':'#555';ctx.font='10px 微软雅黑';ctx.textAlign='center';
+    ctx.fillText(hint,px+pw/2,py+ph-8);ctx.textAlign='left';
   }
-  function _handleWorldTabClick(wx,wy){
-    if(!Social.isWorldPanelOpen())return false;
-    const px=C.CANVAS_W-368,py=120;
-    if(wy>=py+28&&wy<=py+46){let tx=px+12;
-      for(const tab of WTABS){const tw=_mt(tab.label,'10px 微软雅黑')+14;if(wx>=tx&&wx<=tx+tw){worldPanelTab=tab.id;return true;}tx+=tw+4;}
-    }return false;
-  }
-  function _mt(text,font){const c=document.createElement('canvas').getContext('2d');c.font=font||'11px 微软雅黑';return c.measureText(text).width;}
+  function _mt(t,f){const c=document.createElement('canvas').getContext('2d');c.font=f||'11px 微软雅黑';return c.measureText(t).width;}
+  function _handleWorldTabClick(wx,wy){if(!Social.isWorldPanelOpen())return false;
+    const px=C.CANVAS_W-368,py=120;if(wy>=py+28&&wy<=py+46){let tx=px+12;
+    for(const tab of WTABS){const tw=_mt(tab.label,'10px 微软雅黑')+14;if(wx>=tx&&wx<=tx+tw){worldPanelTab=tab.id;Utils.resetWorldLogOffset();return true;}tx+=tw+4;}}return false;}
   // ── 操作提示
   function _drawKeyHints(ctx){
-    const h=['WASD/方向键移动','Shift跑步','J/点击 攻击','F 采集','G 修炼切换','E 背包','C 合成','B 建造','Z 使用物品','T 对话','P 门派','L 世界消息','N 交互'];
-    ctx.fillStyle='rgba(0,0,0,0.5)';Utils.roundRect(ctx,C.CANVAS_W-160,C.CANVAS_H-152,150,142,4);ctx.fill();
-    ctx.fillStyle='#666';ctx.font='9px 微软雅黑';h.forEach((t,i)=>ctx.fillText(t,C.CANVAS_W-155,C.CANVAS_H-126+i*12));
+    const h='WASD移动|Shift跑步|J攻击|F采集|G修炼|E背包|C合成|B建造|Z使用|T对话|P门派|L世界|N交互'.split('|');
+    ctx.fillStyle='rgba(0,0,0,0.5)';Utils.roundRect(ctx,C.CANVAS_W-130,C.CANVAS_H-152,120,142,4);ctx.fill();
+    ctx.fillStyle='#666';ctx.font='9px 微软雅黑';h.forEach((t,i)=>ctx.fillText(t,C.CANVAS_W-125,C.CANVAS_H-126+i*12));
   }
   // ── 事件处理
   function handleClick(wx,wy,p){if(_handleWorldTabClick(wx,wy))return;
-    if(activePanel==='inventory'){
-      const c=8,ss=44,g=4,pw=400,ph=320,px=C.CANVAS_W/2-pw/2,py=C.CANVAS_H/2-ph/2;
-      p.inventory.forEach((it,i)=>{
-        if(i>=c*5)return;const col=i%c,row=Math.floor(i/c),sx=px+12+col*(ss+g),sy=py+36+row*(ss+g);
-        if(wx>=sx&&wx<=sx+ss&&wy>=sy&&wy<=sy+ss){
-          const r=Entities.useItem(it.id);
-          if(r==='add_fuel'){const nb=Building.getBuildingsNear(p,80),f=nb.find(b=>b.isFireSource);if(f)Building.addFuel(f.id,it.id,p);else Utils.notify('附近没有篝火','#f44336');}
-        }
-      });
+    if(activePanel==='inventory'){const c=8,ss=44,g=4,pw=400,ph=320,px=C.CANVAS_W/2-pw/2,py=C.CANVAS_H/2-ph/2;
+      p.inventory.forEach((it,i)=>{if(i>=c*5)return;const col=i%c,row=Math.floor(i/c),sx=px+12+col*(ss+g),sy=py+36+row*(ss+g);
+        if(wx>=sx&&wx<=sx+ss&&wy>=sy&&wy<=sy+ss){const r=Entities.useItem(it.id);if(r==='add_fuel'){const nb=Building.getBuildingsNear(p,80),f=nb.find(b=>b.isFireSource);if(f)Building.addFuel(f.id,it.id,p);else Utils.notify('附近没有篝火','#f44336');}}});
     }
     if(activePanel==='craft'){
       const pw=420,ph=380,px=C.CANVAS_W/2-pw/2,py=C.CANVAS_H/2-ph/2;

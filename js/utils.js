@@ -173,19 +173,44 @@ const Utils = (() => {
   }
   function getChatBubbles() { return chatBubbles; }
 
-  // 世界消息日志（半透明信息面板，支持分类：dialog/combat/sect/other）
-  const worldLog = [];
-  const WORLD_LOG_MAX = 50;
+  // 世界消息日志（localStorage持久化，支持滚轮浏览历史）
+  const WORLD_LOG_KEY = 'xiuxian_worldlog';
+  const WORLD_LOG_MAX = 500; // 最多保存500条
+  let worldLog = [];
+  let worldLogScrollOffset = 0; // 滚轮偏移（0=最新，正数=往历史翻）
+  function _loadWorldLog() {
+    try {
+      const raw = localStorage.getItem(WORLD_LOG_KEY);
+      if (raw) worldLog = JSON.parse(raw);
+      else worldLog = [];
+    } catch(e) { worldLog = []; }
+  }
+  function _saveWorldLog() {
+    try {
+      const trimmed = worldLog.length > WORLD_LOG_MAX ? worldLog.slice(-WORLD_LOG_MAX) : worldLog;
+      localStorage.setItem(WORLD_LOG_KEY, JSON.stringify(trimmed));
+    } catch(e) {}
+  }
   function addWorldLog(speaker, text, category = 'other') {
     worldLog.push({ speaker, text, category, ts: Date.now() });
-    if (worldLog.length > WORLD_LOG_MAX) worldLog.shift();
+    if (worldLog.length > WORLD_LOG_MAX) worldLog = worldLog.slice(-WORLD_LOG_MAX);
+    worldLogScrollOffset = 0; // 新消息自动回到底部
+    _saveWorldLog();
   }
   function getWorldLog() { return worldLog; }
+  // 滚轮控制：向上翻=offset+1，向下翻=offset-1（但≥0）
+  function scrollWorldLog(delta) {
+    worldLogScrollOffset = Math.max(0, worldLogScrollOffset + delta);
+  }
+  function getWorldLogOffset() { return worldLogScrollOffset; }
+  function resetWorldLogOffset() { worldLogScrollOffset = 0; }
+  // 初始化时加载
+  _loadWorldLog();
 
-  // 简单通知队列（最多8条）
+  // 简单通知队列（最多4条，顶部中间显示）
   const notifications = [];
   function notify(msg, color = '#fff', duration = 3000) {
-    if (notifications.length >= 8) return; // 限制最多8条
+    if (notifications.length >= 4) return;
     notifications.push({ msg, color, timer: duration });
   }
   function updateNotifications(dt) {
@@ -202,7 +227,7 @@ const Utils = (() => {
     roundRect, drawBar,
     addFloatingText, updateFloatingTexts, drawFloatingTexts,
     addChatBubble, updateChatBubbles, drawChatBubbles, getChatBubbles,
-    addWorldLog, getWorldLog,
+    addWorldLog, getWorldLog, scrollWorldLog, getWorldLogOffset, resetWorldLogOffset,
     notify, updateNotifications, getNotifications,
   };
 })();
