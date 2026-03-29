@@ -166,7 +166,7 @@ const UI = (() => {
     const npc=Social.getCurrentNPC();if(!npc)return;
     ctx.font='28px serif';ctx.textAlign='center';ctx.fillText(npc.icon||'👤',px+30,py+36);ctx.textAlign='left';
     ctx.fillStyle='#ffd700';ctx.font='bold 14px 微软雅黑';ctx.fillText(npc.name,px+52,py+28);
-    ctx.fillStyle='#888';ctx.font='11px 微软雅黑';ctx.fillText(`好感度 ${Social.getRelation(npc.id)}`,px+52,py+44);
+    ctx.fillStyle='#888';ctx.font='11px 微软雅黑';ctx.fillText(`好感度 ${Social.getRelation(npc)}`,px+52,py+44);
     const hist=Social.getHistory(),maxS=6,from=Math.max(0,hist.length-maxS);
     hist.slice(from).forEach((m,i)=>{
       const u=m.role==='user',ty=py+62+i*34;

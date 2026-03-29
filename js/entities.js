@@ -112,7 +112,28 @@ const Entities = (() => {
         buffList: [],
         atkCooldown: 0,
         aggro: false,
-        fleeTimer: 0,   // 逃跑计时器
+        fleeTimer: 0,
+        // ── 全属性（与玩家对齐） ──
+        spirit: Utils.randInt(10, 60), spiritMax: 80 + (tpl.level||1)*10,
+        hunger: Utils.randInt(40, 100), hungerMax: 100,
+        immunity: Utils.randInt(20, 80), immunityMax: 100,
+        sick: false, sickTimer: 0,
+        xp: 0, xpMax: 50 + (tpl.level||1)*30,
+        realmIdx: Math.min(Math.floor((tpl.level||1)/2), 4),
+        spiritTotal: (tpl.level||1)*50,
+        cultSkillId: (tpl.skills&&tpl.skills[0])||'basic_qi',
+        cultStage: Math.max(1, Math.floor((tpl.level||1)/2)),
+        cultXp: 0,
+        stamina: 80, staminaMax: 100,
+        sprinting: false,
+        weapon: null, armor: null,
+        sectId: null,
+        inventory: [],
+        gold: Utils.randInt(0, 30),
+        facing: { x:1, y:0 },
+        moving: false,
+        // ── 对玩家好感度（随机化） ──
+        relationToPlayer: Utils.randInt(10, 80),
       };
       npcs.push(npc);
       Physics.addCircle(npc.id, npc.x, npc.y, 14, { isStatic: false });
@@ -228,6 +249,40 @@ const Entities = (() => {
     if (player.atkCooldown > 0) player.atkCooldown -= dt;
   }
 
+  // ── 实体通用属性更新（NPC/怪物共用） ──────────────────
+  function _updateEntityStats(e, dt) {
+    // 饥饿消耗
+    e.hunger = Utils.clamp(e.hunger - C.HUNGER_DECAY * dt / 16, 0, e.hungerMax);
+    if (e.hunger <= 0) {
+      e.hp = Utils.clamp(e.hp - 0.03 * dt / 16, 0, e.hpMax);
+    }
+    if (e.hunger < 30) {
+      e.immunity = Utils.clamp(e.immunity - 0.001 * dt / 16, 0, e.immunityMax);
+    }
+    // 免疫力自然恢复
+    if (!e.sick) {
+      e.immunity = Utils.clamp(e.immunity + 0.001 * dt / 16, 0, e.immunityMax);
+    }
+    // 饥饿过低+免疫力低 → 生病
+    if (!e.sick && e.hunger < 15 && e.immunity < 30) {
+      if (Math.random() < 0.0001 * dt / 16) { e.sick = true; e.sickTimer = 0; }
+    }
+    // 生病影响
+    if (e.sick) {
+      e.sickTimer += dt;
+      e.hp = Utils.clamp(e.hp - 0.02 * dt/16, 0, e.hpMax);
+      e.immunity = Utils.clamp(e.immunity - 0.0005 * dt/16, 0, e.immunityMax);
+      if (e.sickTimer > 30000 && e.immunity > 50) { e.sick = false; e.sickTimer = 0; }
+    }
+    // 灵力自然恢复
+    const spiritAtPos = World.getSpiritAt(e.x, e.y);
+    const weatherCfg = Weather.getCfg();
+    const regen = C.SPIRIT_REGEN_BASE * spiritAtPos * (weatherCfg.spiritMul || 1) * 0.5;
+    e.spirit = Utils.clamp(e.spirit + regen * dt/1000, 0, e.spiritMax);
+    // 体力恢复
+    e.stamina = Utils.clamp((e.stamina||0) + C.SPRINT_STAMINA_REGEN * dt / 16, 0, e.staminaMax);
+  }
+
   function _handleBuffs(entity, dt) {
     for (let i = entity.buffList.length - 1; i >= 0; i--) {
       entity.buffList[i].timer -= dt / 1000;
@@ -261,6 +316,9 @@ const Entities = (() => {
       }
 
       _handleBuffs(npc, dt);
+
+      // ── NPC属性更新（饥饿/生病/灵力/免疫） ──
+      _updateEntityStats(npc, dt);
 
       if (npc.hostile) {
         _aiHostile(npc, dt, weatherCfg);
@@ -424,16 +482,27 @@ const Entities = (() => {
   }
 
   function _npcSocialInteraction(npc) {
+    // 与附近NPC互动
     for (const other of npcs) {
       if (other === npc || !other.alive) continue;
       const d = Utils.dist(npc, other);
       if (d < C.NPC_SOCIAL_RADIUS) {
         // 同阵营增加好感
         if (npc.faction === other.faction) {
-          npc.relation[other.id] = (npc.relation[other.id] || 50) + Utils.randInt(1, 5);
+          npc.relation[other.id] = (npc.relation[other.id] || 50) + Utils.randInt(1, 3);
+          npc.relation[other.id] = Utils.clamp(npc.relation[other.id], 0, 100);
+        }
+        // 敌对阵营降低好感
+        if (npc.faction !== other.faction && !npc.hostile && other.hostile) {
+          npc.relation[other.id] = (npc.relation[other.id] || 30) - Utils.randInt(1, 2);
           npc.relation[other.id] = Utils.clamp(npc.relation[other.id], 0, 100);
         }
       }
+    }
+    // 与玩家互动：靠近友方NPC时缓慢增加好感
+    const dToPlayer = Utils.dist(npc, player);
+    if (dToPlayer < C.NPC_SOCIAL_RADIUS && !npc.hostile) {
+      npc.relationToPlayer = Utils.clamp((npc.relationToPlayer || 50) + 0.01, 0, 100);
     }
   }
 
@@ -616,14 +685,19 @@ const Entities = (() => {
     ctx.font = '22px serif';
     ctx.textAlign = 'center';
     ctx.fillText(npc.icon || '👤', sx, sy + 7);
-    // 名字
+    // 名字+境界
     ctx.font = '10px 微软雅黑';
     ctx.fillStyle = npc.hostile ? '#f44336' : '#adf';
-    ctx.fillText(npc.name, sx, sy - 16);
-    // 血条（受伤时显示）
-    if (npc.hp < npc.hpMax) {
-      Utils.drawBar(ctx, sx - 18, sy - 28, 36, 4, npc.hp, npc.hpMax, C.COLOR.HP);
+    const realmLabel = npc.realmIdx > 0 ? REALMS[npc.realmIdx]?.name || '' : '';
+    ctx.fillText(npc.name + (realmLabel ? ` [${realmLabel}]` : ''), sx, sy - 16);
+    // 血条（始终显示）
+    Utils.drawBar(ctx, sx - 18, sy - 28, 36, 4, npc.hp, npc.hpMax, C.COLOR.HP);
+    // 灵力条（有灵力时显示）
+    if ((npc.spiritMax||0) > 0) {
+      Utils.drawBar(ctx, sx - 18, sy - 24, 36, 3, npc.spirit||0, npc.spiritMax, C.COLOR.SPIRIT);
     }
+    // 状态标记
+    if (npc.sick) { ctx.font = '10px serif'; ctx.fillText('🤢', sx + 16, sy - 8); }
     ctx.textAlign = 'left';
   }
 
